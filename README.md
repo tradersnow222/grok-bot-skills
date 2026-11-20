@@ -22,10 +22,10 @@ Over a thousand bots are already listed on [grok-bot.directory](https://grok-bot
 
 ## Skills
 
-| Skill | What it does | Link |
-|---|---|---|
-| grok-bot-directory-router | Checks your team first. If none is a strong fit, shows the top 3 listed bots. Suggest only. | [SKILL.md](skills/grok-bot-directory-router/SKILL.md) |
-| pr-landing-rules | States the three gates for a squash merge: a human grant, a non-author agent PASS, and green CI on the exact commit. | [SKILL.md](skills/pr-landing-rules/SKILL.md) |
+| Skill | What it does | Use it when | Link |
+|---|---|---|---|
+| grok-bot-directory-router | Checks your team first. If none is a strong fit, shows the top 3 listed bots. Suggest only. | You start a new project, a new workstream, or want a bot for a job. | [SKILL.md](skills/grok-bot-directory-router/SKILL.md) |
+| pr-landing-rules | States the three gates for a squash merge: a human grant, a non-author agent PASS, and green CI on the exact commit. | An agent is about to merge a pull request, land a stack, or decide whether a pull request is ready to merge. | [SKILL.md](skills/pr-landing-rules/SKILL.md) |
 
 <details>
 <summary>grok-bot-directory-router</summary>
