@@ -22,7 +22,7 @@ from pathlib import Path
 
 # Edit this one constant. It is printed on every result and sent in the
 # User-Agent. Do not copy the URL into other files.
-REPO_URL = "https://github.com/tradersnow222/grok-bot-skills"
+REPO_URL = "https://github.com/tradersnow222/snowstack"
 
 USER_AGENT = f"grok-bot-directory-router/0.1 (+{REPO_URL})"
 HOMEPAGE_URL = "https://grok-bot.directory/"

@@ -3,7 +3,7 @@
 ## Report a problem privately
 
 Please do not open a public issue for a security problem. Use
-[private vulnerability reporting](https://github.com/tradersnow222/grok-bot-skills/security/advisories/new)
+[private vulnerability reporting](https://github.com/tradersnow222/snowstack/security/advisories/new)
 on this repository. Include what you found, how to repeat it, and what an attacker could do with it.
 
 You can expect a first reply within a few days.

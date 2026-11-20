@@ -1,9 +1,11 @@
-# grok-bot-skills
+# snowstack
 
-[![CI](https://github.com/tradersnow222/grok-bot-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/tradersnow222/grok-bot-skills/actions/workflows/ci.yml)
+[![CI](https://github.com/tradersnow222/snowstack/actions/workflows/ci.yml/badge.svg)](https://github.com/tradersnow222/snowstack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 **Open skills for Grok Bot. The first one finds existing bots for you when you start something new.**
+
+This repository is not published to npm or any package registry. A different `snowstack` package and an unrelated company, Snowstack Inc., exist. This project is unaffiliated with them.
 
 ## Why it's useful
 
@@ -49,7 +51,7 @@ Example output for the task "start a job search":
    https://x.ai/bot/y2wrIfUN63TY6TFBiLOyC
 
 Data from grok-bot.directory
-Found by grok-bot-directory-router: https://github.com/tradersnow222/grok-bot-skills
+Found by grok-bot-directory-router: https://github.com/tradersnow222/snowstack
 ```
 
 Matches are based on shared words, so a weak third pick can happen. Read the reason line before you pick.
@@ -93,7 +95,7 @@ Bot listings come from [grok-bot.directory](https://grok-bot.directory/). Thank 
 
 ## Author
 
-Matt Snow ([@tradersnow](https://x.com/tradersnow))
+Matt Snow ([@trader_snow](https://x.com/trader_snow))
 
 ## License
 
