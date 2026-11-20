@@ -4,7 +4,7 @@
 
 **TLDR:** Use a webhook routine when something outside can tell your bot that new data arrived. Keep a timed routine when the clock is the reason the job runs. And check your usage breakdown first, because your chats might be costing more than your routines.
 
-I run a team of Grok Bots, and a lot of their work runs on routines. Like many others, I immediately started running into usage limits early in the week! At first, I simply cut back most of my routines. But recently, Matt Palmer (@mattyp) and Lauren Tan (@poteto) brought up webhooks in their [live Grok Bot Q&A](https://x.com/mattyp/status/2121439659179848108). So I dug in. Here's what I learned, in plain terms, and how to decide which jobs should use a webhook.
+I run a team of Grok Bots, and a lot of their work runs on routines. Like many others, I immediately started running into usage limits early in the week! At first, I simply cut back most of my routines. But recently, Matt Palmer (@mattyp) and Lauren Tan (@poteto) talked usage in their [live Grok Bot Q&A](https://x.com/mattyp/status/2121439659179848108), and the webhooks idea came out of it. So I dug into webhooks as one way to cut wasted routine runs. Here's what I learned, in plain terms, and how to decide which jobs should use a webhook.
 
 ## Timed routines and webhooks
 
@@ -85,6 +85,8 @@ work. Don't change anything yet.
 Just give me the list.
 ```
 
+Webhooks are one good way to trim usage, but they aren't the only one. If a timed routine is costing you usage, the first cuts are usually simpler: pause the ones you don't need, run the rest less often and only in waking hours, and tell them to stay quiet when nothing changed. Grok Bot's own docs put those first. Switch to a built-in trigger or a webhook when the job is really waiting on an event.
+
 ## Two updates I'm making now
 
 These are in progress, so there are no before-and-after numbers here yet.
@@ -98,10 +100,10 @@ Next up is a daily finance check. Instead of running on a timer, it'll wake up w
 
 - **Guard each webhook routine's secret key.** Every request has to include the routine's secret key (also called a bearer token) in the request's Authorization header. Grok Bot doesn't check anything else, so your bot can't confirm who actually sent a request. If the key leaks, anyone can wake your bot and feed it whatever instructions they want. Treat it like a password, keep it out of chats, and never post it.
 - **Every request uses usage.** Grok Bot doesn't filter requests for you, so each one starts a run that counts. Do your filtering in your outside script.
-- **Paused means lost.** A request sent to a paused routine is lost unless the sender tries again. And if a run fails, Grok Bot won't retry it.
+- **Paused means lost.** A request sent to a paused routine is lost unless the sender tries again. A run that hits the hourly cap is not retried automatically.
 - **There are limits.** Grok Bot allows up to 300 runs an hour across all your routines, and 200 an hour for any one routine.
 - **Some services need a go-between.** Stripe, App Store Connect, and the push notifications from Gmail and Google Calendar can't add that key. They need a small relay in between, which receives their message and passes it on with your key. Hookdeck is one example, or you can write a short Cloudflare Worker.
-- **Some services charge extra.** Zapier's free plan treats webhooks as a premium feature, and IFTTT webhooks need a paid plan, so check current pricing before you build on them.
+- **Some services charge extra.** IFTTT webhooks need a paid plan, and Zapier's free plan treats many apps as premium, so check current pricing before you build on them.
 
 It's worth telling your bot about the key up front:
 
