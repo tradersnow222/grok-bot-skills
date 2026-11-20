@@ -191,6 +191,7 @@ class PolicyTests(unittest.TestCase):
                 rank.check_url(blocked)
 
     def test_user_agent_includes_repo_once(self):
+        self.assertEqual(rank.REPO_URL, "https://github.com/tradersnow222/snowstack")
         self.assertEqual(
             rank.USER_AGENT,
             f"grok-bot-directory-router/0.1 (+{rank.REPO_URL})",
