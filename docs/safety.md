@@ -43,17 +43,25 @@ Directory suggestions end with `Data from grok-bot.directory` and a Found by lin
 
 ## Privacy scrub
 
-The `test` check runs `scripts/privacy_scrub.py`. The script uses only the Python standard library. It scans every tracked file. On a pull request it also scans the commits in `origin/<base>..HEAD`, including commit messages and author and committer names and emails. On a push to `main` it scans the commits that were pushed. Checkout for that job uses a full history so the range is available.
+The `test` check runs `scripts/privacy_scrub.py`. The script uses only the Python standard library. It scans every tracked text file. Files with a known binary extension (images, fonts, pdf, zip, and gzip) are skipped. A NUL byte does not hide a file: the bytes are decoded as text, including UTF-16 when the bytes look like it, and then scanned. On a pull request it also scans the commits in `origin/<base>..HEAD`, including commit messages, author and committer names and emails, and the lines added in that range, so a secret added in one commit and removed in the next still fails. Pull request title and body are passed to the script through environment variables and scanned with the same rules. On a push to `main` it scans the commits that were pushed, and the title and body scan is a no-op. Checkout for that job uses a full history so the range is available.
 
 The scrub fails when it finds any of these:
 
 - An email address, except a GitHub noreply address and `cursoragent@cursor.com`. The noreply forms are `<digits>+<user>@users.noreply.github.com`, `<user>@users.noreply.github.com`, and `noreply@github.com`. A `Co-authored-by` trailer is part of the commit message, so an email there fails the check too.
-- A machine path: a Linux or macOS home directory (including a home directory named box), a workspace root path, or a Windows profile path.
-- A key-like string: a GitHub token (`ghp_`, `gho_`, `ghs_`, or `github_pat_`), an `xai-` or `sk-` API key, an AWS access key id (`AKIA` plus 16 letters or digits), a Slack token (`xoxb-`, `xoxa-`, `xoxp-`, `xoxr-`, or `xoxs-`), a private key block, or a long high-entropy token assigned to a name that contains `key`, `secret`, `token`, or `password`.
+- A machine path: a Linux or macOS home directory, with or without a path after the user name, including a home directory named box; the root account's home directory; a workspace root path; a Windows profile path, including the JSON-escaped form; a Windows drive mounted under the Linux mnt path; or a Cursor store path.
+- A key-like string: a GitHub token (`ghp_`, `gho_`, `ghs_`, `ghu_`, `ghr_`, or `github_pat_`), an `xai-` or `sk-` API key, a live Stripe-style `sk_live_` or `rk_live_` key, an AWS access key id (`AKIA` or `ASIA` plus 16 letters or digits), a Google API key starting with `AIza`, a Slack token (`xoxb-`, `xoxa-`, `xoxp-`, `xoxr-`, or `xoxs-`), a private key block, an `Authorization: Bearer` token, a dotted JWT made of three base64url parts, or a long high-entropy token assigned to a name that contains `key`, `secret`, `token`, `password`, `auth`, `credential`, or `bearer`.
 
 Each finding prints the file and line, or the commit SHA, the rule name, and a redacted preview. The matched value itself is not printed.
 
-`scripts/privacy_scrub_allow.txt` can skip a documented test fixture by path, or one line of a fixture with `path:line`. The scrub's own tests build sample values by joining pieces at runtime so those samples are not stored in the repository.
+`scripts/privacy_scrub_allow.txt` can skip a documented test fixture by path, or one line of a fixture with `path:line`. Allowlist paths are matched against the raw git path, so a backslash in a file name is not treated as a directory separator. The scrub's own tests build sample values by joining pieces at runtime so those samples are not stored in the repository.
+
+### Known limits
+
+This check catches accidental leaks. It is not a detector for a determined attacker, and it is only one layer. A human scrub stays the second layer. These are known gaps:
+
+- Obfuscated emails are not detected, including a `%40` encoding, `[at]`, a phrase such as ` at ` plus ` dot `, and a full-width at sign.
+- Base64-encoded secrets and emails are not detected.
+- File names are not scanned.
 
 From the repository root:
 

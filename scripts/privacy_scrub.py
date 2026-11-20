@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 import re
 import subprocess
 import sys
@@ -24,6 +25,23 @@ from pathlib import Path
 _MIN_SECRET_LENGTH = 20
 _MIN_ENTROPY = 3.5
 _MIN_UNIQUE = 8
+
+_BINARY_EXTS = frozenset(
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".ico",
+        ".pdf",
+        ".zip",
+        ".gz",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+    }
+)
 
 _EMAIL_RE = re.compile(
     r"(?<![A-Za-z0-9._%+\-])"
@@ -42,18 +60,28 @@ _ALLOWED_EMAILS = frozenset(
 
 _GITHUB_RE = re.compile(
     r"ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36}"
+    r"|ghu_[A-Za-z0-9]{36}|ghr_[A-Za-z0-9]{36}"
     r"|github_pat_[A-Za-z0-9_]{22,}"
 )
-_API_RE = re.compile(r"(?:xai|sk)-[A-Za-z0-9][A-Za-z0-9_\-]{19,}")
-_AWS_RE = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
+_API_RE = re.compile(
+    r"(?:xai|sk)-[A-Za-z0-9][A-Za-z0-9_\-]{19,}"
+    r"|(?:sk|rk)_live_[A-Za-z0-9]{16,}"
+)
+_AWS_RE = re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")
+_GOOGLE_API_RE = re.compile(r"AIza[0-9A-Za-z_\-]{20,}")
 _SLACK_RE = re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}")
 _PRIVATE_KEY_RE = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
+_BEARER_RE = re.compile(r"(?i)\bAuthorization\s*:\s*Bearer\s+(\S{8,})")
+_JWT_RE = re.compile(r"\b[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
 _ASSIGN_RE = re.compile(
     r"(?i)"
-    r"(?P<name>[A-Za-z0-9_.\"']*(?:key|secret|token|password)[A-Za-z0-9_.\"']*)"
+    r"(?P<name>[A-Za-z0-9_.\"']*(?:"
+    r"key|secret|token|password|credential|bearer|authorization|authentication"
+    r"|(?<![A-Za-z])auth(?![A-Za-z])"
+    r")[A-Za-z0-9_.\"']*)"
     r"\s*[=:]\s*"
     r"(?:(?P<q>['\"])(?P<quoted>[^'\"\n]*)(?P=q)"
-    r"|(?P<bare>[A-Za-z0-9+/=_\-]{20,}))"
+    r"|(?P<bare>[A-Za-z0-9+/=_\-.]{8,}))"
 )
 
 
@@ -128,8 +156,9 @@ def scan_text(rel: str, text: str, skip_lines: set[int] | None = None) -> list[F
 def scan_files(root: Path, rel_paths: list[str], allow: Allowlist) -> list[Finding]:
     findings: list[Finding] = []
     for rel in rel_paths:
-        posix = rel.replace("\\", "/")
-        if posix in allow.files:
+        # Match the allowlist against the raw git path, not a slash-normalized
+        # form, so a backslash in a file name is not treated as a separator.
+        if rel in allow.files:
             continue
         path = root / rel
         if not path.is_file():
@@ -137,8 +166,8 @@ def scan_files(root: Path, rel_paths: list[str], allow: Allowlist) -> list[Findi
         text = _read_text(path)
         if text is None:
             continue
-        skip = {number for name, number in allow.lines if name == posix}
-        findings.extend(scan_text(posix, text, skip))
+        skip = {number for name, number in allow.lines if name == rel}
+        findings.extend(scan_text(rel, text, skip))
     return findings
 
 
@@ -148,14 +177,27 @@ def scan_tracked_files(root: Path, allow: Allowlist | None = None) -> list[Findi
     return scan_files(root, _tracked_paths(root), allow)
 
 
-def scan_commits(root: Path, expr: str) -> list[Finding]:
+def scan_commits(root: Path, expr: str, allow: Allowlist | None = None) -> list[Finding]:
     findings: list[Finding] = []
-    for sha in _rev_list(root, normalize_range(expr)):
+    expr = normalize_range(expr)
+    for sha in _rev_list(root, expr):
         meta = _commit_meta(root, sha)
         message = meta.pop("message")
         findings.extend(scan_text(f"{sha}:commit-message", message))
         for field, value in meta.items():
             findings.extend(scan_text(f"{sha}:{field}", value))
+    findings.extend(_scan_added_lines(root, expr, allow))
+    return findings
+
+
+def scan_env_texts(names: list[str]) -> list[Finding]:
+    """Scan environment values (for example a pull request title or body)."""
+    findings: list[Finding] = []
+    for name in names:
+        value = os.environ.get(name, "")
+        if not value:
+            continue
+        findings.extend(scan_text(f"env:{name}", value))
     return findings
 
 
@@ -172,13 +214,22 @@ def main(argv: list[str] | None = None) -> int:
         default="",
         help="Allowlist file. Default: scripts/privacy_scrub_allow.txt",
     )
+    parser.add_argument(
+        "--text-env",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Scan the value of this environment variable, such as PR_TITLE",
+    )
     args = parser.parse_args(argv)
     root = Path(args.root).resolve()
     allow_path = Path(args.allow) if args.allow else root / "scripts" / "privacy_scrub_allow.txt"
     try:
-        findings = scan_tracked_files(root, load_allowlist(allow_path))
+        allow = load_allowlist(allow_path)
+        findings = scan_tracked_files(root, allow)
         if args.commits:
-            findings.extend(scan_commits(root, args.commits))
+            findings.extend(scan_commits(root, args.commits, allow))
+        findings.extend(scan_env_texts(args.text_env))
     except RuntimeError as exc:
         print(f"privacy scrub: {exc}", file=sys.stderr)
         return 2
@@ -208,7 +259,13 @@ def _scan_line(line: str) -> list[tuple[str, str]]:
 
     for rule, regex, prefixes in _key_specs():
         for match in regex.finditer(line):
-            hits.append((rule, _preview_known(match.group(0), prefixes)))
+            if rule == "bearer-token":
+                preview = "Authorization: Bearer ***"
+            elif rule == "jwt":
+                preview = "***.***.***"
+            else:
+                preview = _preview_known(match.group(0), prefixes)
+            hits.append((rule, preview))
             covered.append(match.span())
 
     for match in _ASSIGN_RE.finditer(line):
@@ -225,11 +282,14 @@ def _scan_line(line: str) -> list[tuple[str, str]]:
 
 def _key_specs() -> tuple[tuple[str, re.Pattern[str], tuple[str, ...]], ...]:
     return (
-        ("github-token", _GITHUB_RE, ("github_pat_", "ghp_", "gho_", "ghs_")),
-        ("api-key", _API_RE, ("xai-", "sk-")),
-        ("aws-key", _AWS_RE, ("AKIA",)),
+        ("github-token", _GITHUB_RE, ("github_pat_", "ghp_", "gho_", "ghs_", "ghu_", "ghr_")),
+        ("api-key", _API_RE, ("xai-", "sk_live_", "rk_live_", "sk-")),
+        ("aws-key", _AWS_RE, ("AKIA", "ASIA")),
+        ("api-key", _GOOGLE_API_RE, ("AIza",)),
         ("slack-token", _SLACK_RE, ("xoxb-", "xoxa-", "xoxp-", "xoxr-", "xoxs-")),
         ("private-key", _PRIVATE_KEY_RE, ("-----BEGIN ",)),
+        ("bearer-token", _BEARER_RE, ()),
+        ("jwt", _JWT_RE, ()),
     )
 
 
@@ -255,14 +315,20 @@ def _path_regexes() -> tuple[re.Pattern[str], ...]:
     home = re.escape("/ho" + "me/")
     users = re.escape("/Use" + "rs/")
     workspace = re.escape("/work" + "space")
-    windows = re.escape("C:\\" + "Users" + "\\")
-    name = r"[A-Za-z0-9._-]+/"
+    root_home = re.escape("/ro" + "ot")
+    mnt_users = re.escape("/mnt/c/" + "Users")
+    stores = re.escape("/cur" + "sor/stores")
+    windows = r"C:\\+Use" + r"rs\\+"
+    name = r"[A-Za-z0-9._-]+"
     boundary = r"(?![A-Za-z0-9._-])"
     return (
         re.compile(home_box + boundary),
-        re.compile(home + name),
-        re.compile(users + name),
+        re.compile(home + name + boundary),
+        re.compile(users + name + boundary),
         re.compile(workspace + boundary),
+        re.compile(root_home + boundary),
+        re.compile(mnt_users + boundary, re.IGNORECASE),
+        re.compile(stores + boundary),
         re.compile(windows, re.IGNORECASE),
     )
 
@@ -294,15 +360,22 @@ def _preview_email(address: str) -> str:
 
 def _preview_path(raw: str) -> str:
     lowered = raw.lower()
-    windows = "c:\\" + "users" + "\\"
-    if windows in lowered:
+    win = "c:" + "\\" + "users"
+    win_json = "c:" + "\\\\" + "users"
+    if win in lowered or win_json in lowered:
         return "C:\\" + "Users" + "\\***"
+    if lowered.startswith("/mnt/c/" + "users"):
+        return "/m***"
     if raw.startswith("/Use" + "rs/"):
         return "/Use" + "rs/***"
     if raw.startswith("/ho" + "me/"):
         return "/ho" + "me/***"
     if raw.startswith("/work" + "space"):
         return "/w***"
+    if raw.startswith("/ro" + "ot"):
+        return "/r***"
+    if raw.startswith("/cur" + "sor/stores"):
+        return "/c***"
     return "***"
 
 
@@ -315,14 +388,36 @@ def _preview_known(raw: str, prefixes: tuple[str, ...]) -> str:
     return "***"
 
 
+def _is_skipped_binary(path: Path) -> bool:
+    return path.suffix.lower() in _BINARY_EXTS
+
+
+def _looks_like_utf16(data: bytes) -> bool:
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return True
+    if len(data) < 4 or len(data) % 2 != 0:
+        return False
+    pairs = len(data) // 2
+    even_nuls = data[0::2].count(0)
+    odd_nuls = data[1::2].count(0)
+    return even_nuls * 2 >= pairs or odd_nuls * 2 >= pairs
+
+
 def _read_text(path: Path) -> str | None:
-    data = path.read_bytes()
-    if b"\0" in data:
+    if _is_skipped_binary(path):
         return None
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
-        return data.decode("latin-1")
+    data = path.read_bytes()
+    if _looks_like_utf16(data):
+        if data.startswith(b"\xfe\xff"):
+            encoding = "utf-16-be"
+        elif data.startswith(b"\xff\xfe"):
+            encoding = "utf-16-le"
+        else:
+            odd_nuls = data[1::2].count(0)
+            even_nuls = data[0::2].count(0)
+            encoding = "utf-16-le" if odd_nuls >= even_nuls else "utf-16-be"
+        return data.decode(encoding, errors="replace")
+    return data.decode("utf-8", errors="replace")
 
 
 def _tracked_paths(root: Path) -> list[str]:
@@ -374,6 +469,37 @@ def _commit_meta(root: Path, sha: str) -> dict[str, str]:
         "committer-email": committer_email,
         "message": message,
     }
+
+
+def _scan_added_lines(root: Path, expr: str, allow: Allowlist | None = None) -> list[Finding]:
+    """Scan lines added in git log -p over expr, including later-removed secrets."""
+    result = subprocess.run(
+        ["git", "log", "-p", "--text", "--format=%x00%H", expr],
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("git log failed")
+    findings: list[Finding] = []
+    for record in result.stdout.split(b"\0"):
+        if not record.strip():
+            continue
+        header, sep, rest = record.partition(b"\n")
+        sha = _decode_field(header.strip())
+        if not sha:
+            continue
+        path = "unknown"
+        text = _decode_field(rest) if sep else ""
+        for line in text.splitlines():
+            if line.startswith("+++ b/"):
+                path = line[6:]
+            elif line.startswith("+") and not line.startswith("+++"):
+                if allow and path in allow.files:
+                    continue
+                for rule, preview in _scan_line(line[1:]):
+                    findings.append(Finding(f"{sha}:added:{path}", rule, preview))
+    return findings
 
 
 def _decode_field(blob: bytes) -> str:

@@ -61,9 +61,18 @@ class RuleTests(unittest.TestCase):
             joined("/work", "space"),
             joined("/work", "space", "/proj"),
             joined("/Use", "rs/", "ada", "/proj"),
+            joined("/Use", "rs/", "ada"),
             joined("/ho", "me/", "ada", "/proj"),
+            joined("/ho", "me/", "ada"),
             joined("C:\\", "Users", "\\", "ada"),
             joined("c:\\", "users", "\\", "ada"),
+            joined("C:\\\\", "Users", "\\\\", "ada"),
+            joined("/ro", "ot"),
+            joined("/ro", "ot", "/src"),
+            joined("/mnt/c/", "Users"),
+            joined("/mnt/c/", "Users", "/ada"),
+            joined("/cur", "sor/stores"),
+            joined("/cur", "sor/stores", "/id"),
         ]
         for sample in samples:
             findings = privacy_scrub.scan_text("a.txt", f"path {sample}\n")
@@ -75,10 +84,12 @@ class RuleTests(unittest.TestCase):
     def test_path_lookalikes_are_ignored(self):
         samples = [
             joined("/ho", "mework", "/notes"),
-            joined("/ho", "me/bo", "xer"),
-            joined("/Use", "rs/", "ada"),
             joined("/work", "space2"),
             "see you at home",
+            joined("/ro", "oter"),
+            joined("/ro", "ots"),
+            joined("/cur", "sor/store"),
+            joined("/mnt/c/", "User"),
         ]
         for sample in samples:
             self.assertEqual(privacy_scrub.scan_text("a.txt", sample + "\n"), [], sample)
@@ -88,15 +99,38 @@ class RuleTests(unittest.TestCase):
             ("github-token", joined("gh", "p_") + ("A1b2" * 9)),
             ("github-token", joined("gh", "o_") + ("A1b2" * 9)),
             ("github-token", joined("gh", "s_") + ("A1b2" * 9)),
+            ("github-token", joined("gh", "u_") + ("A1b2" * 9)),
+            ("github-token", joined("gh", "r_") + ("A1b2" * 9)),
             ("github-token", joined("github", "_pat_") + ("aB" * 11)),
             ("api-key", joined("xa", "i-") + ("aB3c" * 6)),
             ("api-key", joined("s", "k-") + ("cD4e" * 6)),
+            ("api-key", joined("sk", "_live_") + ("cD4e" * 6)),
+            ("api-key", joined("rk", "_live_") + ("cD4e" * 6)),
+            ("api-key", joined("AI", "za") + ("A1b2C3d4" * 3)),
             ("aws-key", joined("AK", "IA") + "B2C3D4E5F6G7H8I9"),
+            ("aws-key", joined("AS", "IA") + "B2C3D4E5F6G7H8I9"),
             ("slack-token", joined("xo", "xb-") + "1234567890abcdef"),
             ("slack-token", joined("xo", "xp-") + "1234567890abcdef"),
             (
                 "private-key",
                 joined("-----BE", "GIN RSA ", "PRIVATE KEY-----"),
+            ),
+            (
+                "bearer-token",
+                joined("Author", "ization: Bearer ", "abcdef12", "34567890xyz"),
+            ),
+            (
+                "jwt",
+                joined(
+                    "eyJhbGciOi",
+                    "JIUzI1NiJ9",
+                    ".",
+                    "eyJzdWIiOi",
+                    "IxMjM0NTY3In0",
+                    ".",
+                    "dGVzdHNpZ",
+                    "25hdHVyZQ",
+                ),
             ),
         ]
         for rule, sample in samples:
@@ -117,6 +151,29 @@ class RuleTests(unittest.TestCase):
             findings = privacy_scrub.scan_text("a.txt", line + "\n")
             self.assertTrue(any(item.rule == "assigned-secret" for item in findings), line)
             self.assertNotIn(value, "\n".join(item.render() for item in findings))
+
+    def test_assigned_secret_keeps_dotted_value(self):
+        # Two dotted segments so this is not also classified as a JWT.
+        value = joined("abC1deF2", ".", "ghI3jkL4mnO5pqR6")
+        line = f"token={value}"
+        findings = privacy_scrub.scan_text("a.txt", line + "\n")
+        self.assertTrue(any(item.rule == "assigned-secret" for item in findings), findings)
+        self.assertNotIn(value, "\n".join(item.render() for item in findings))
+
+    def test_assigned_secret_auth_credential_bearer_names(self):
+        value = joined("abC1", "deF2", "ghI3", "jkL4", "mnO5")
+        lines = [
+            f'auth = "{value}"',
+            f'credential = "{value}"',
+            f'bearer = "{value}"',
+        ]
+        for line in lines:
+            findings = privacy_scrub.scan_text("a.txt", line + "\n")
+            self.assertTrue(any(item.rule == "assigned-secret" for item in findings), line)
+            self.assertNotIn(value, "\n".join(item.render() for item in findings))
+        author = f'author = "{value}"'
+        rules = [item.rule for item in privacy_scrub.scan_text("a.txt", author + "\n")]
+        self.assertNotIn("assigned-secret", rules, author)
 
     def test_low_entropy_or_unrelated_assignment_is_ignored(self):
         value = joined("abC1", "deF2", "ghI3", "jkL4", "mnO5")
@@ -150,6 +207,55 @@ class RuleTests(unittest.TestCase):
             self.assertEqual(privacy_scrub.scan_files(root, ["fixture.txt"], one_line), [])
             other = privacy_scrub.Allowlist(frozenset(), frozenset({("fixture.txt", 1)}))
             self.assertTrue(privacy_scrub.scan_files(root, ["fixture.txt"], other))
+
+    def test_allowlist_uses_raw_git_path(self):
+        email = joined("someone", "@", "example.com")
+        raw = "tests" + "\\" + "fixtures" + "\\" + "privacy_scrub_sample.txt"
+        slash = "tests/fixtures/privacy_scrub_sample.txt"
+        allow = privacy_scrub.Allowlist(frozenset({slash}), frozenset())
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / raw).write_text(f"contact {email}\n", encoding="utf-8")
+            findings = privacy_scrub.scan_files(root, [raw], allow)
+            self.assertTrue(any(item.rule == "email" for item in findings), findings)
+            self.assertNotIn(email, "\n".join(item.render() for item in findings))
+            (root / "tests" / "fixtures").mkdir(parents=True)
+            (root / slash).write_text(f"contact {email}\n", encoding="utf-8")
+            self.assertEqual(privacy_scrub.scan_files(root, [slash], allow), [])
+
+    def test_nul_byte_does_not_hide_a_file(self):
+        email = joined("someone", "@", "example.com")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "notes.txt").write_bytes(
+                f"contact {email}\n".encode("utf-8") + b"\x00more\n"
+            )
+            findings = privacy_scrub.scan_files(
+                root, ["notes.txt"], privacy_scrub.Allowlist(frozenset(), frozenset())
+            )
+            self.assertTrue(any(item.rule == "email" for item in findings), findings)
+            self.assertNotIn(email, "\n".join(item.render() for item in findings))
+
+    def test_utf16_file_is_scanned(self):
+        email = joined("someone", "@", "example.com")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "notes.txt").write_bytes(("contact " + email + "\n").encode("utf-16"))
+            findings = privacy_scrub.scan_files(
+                root, ["notes.txt"], privacy_scrub.Allowlist(frozenset(), frozenset())
+            )
+            self.assertTrue(any(item.rule == "email" for item in findings), findings)
+            self.assertNotIn(email, "\n".join(item.render() for item in findings))
+
+    def test_binary_extension_is_skipped(self):
+        email = joined("someone", "@", "example.com")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "icon.png").write_bytes(f"contact {email}\n".encode("utf-8"))
+            findings = privacy_scrub.scan_files(
+                root, ["icon.png"], privacy_scrub.Allowlist(frozenset(), frozenset())
+            )
+            self.assertEqual(findings, [])
 
     def test_committed_fixture_is_skipped_by_the_default_allowlist(self):
         allow = privacy_scrub.load_allowlist(ROOT / "scripts" / "privacy_scrub_allow.txt")
@@ -187,7 +293,7 @@ class CommitScanTests(unittest.TestCase):
         message = "Record a note\n\nCo-authored-by: Someone <" + email + ">\n"
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            sha = _commit(root, message, ALLOWED_EMAIL, ALLOWED_EMAIL)
+            sha = _commit(root, "readme.txt", "clean\n", message, ALLOWED_EMAIL, ALLOWED_EMAIL)
             findings = privacy_scrub.scan_commits(root, "HEAD")
             rendered = "\n".join(item.render() for item in findings)
             self.assertTrue(
@@ -208,7 +314,7 @@ class CommitScanTests(unittest.TestCase):
     def test_clean_commit_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            _commit(root, "Record a note\n", ALLOWED_EMAIL, ALLOWED_EMAIL)
+            _commit(root, "readme.txt", "clean\n", "Record a note\n", ALLOWED_EMAIL, ALLOWED_EMAIL)
             self.assertEqual(privacy_scrub.scan_commits(root, "HEAD"), [])
             completed = _run_script(root, "HEAD")
             self.assertEqual(completed.returncode, 0, completed.stderr)
@@ -223,7 +329,7 @@ class CommitScanTests(unittest.TestCase):
         for field, author, committer in cases:
             with tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
-                sha = _commit(root, "Record a note\n", author, committer)
+                sha = _commit(root, "readme.txt", "clean\n", "Record a note\n", author, committer)
                 findings = privacy_scrub.scan_commits(root, "HEAD")
                 rendered = "\n".join(item.render() for item in findings)
                 self.assertTrue(
@@ -238,7 +344,7 @@ class CommitScanTests(unittest.TestCase):
         message = "note " + path + " " + token + "\n"
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            sha = _commit(root, message, ALLOWED_EMAIL, ALLOWED_EMAIL)
+            sha = _commit(root, "readme.txt", "clean\n", message, ALLOWED_EMAIL, ALLOWED_EMAIL)
             findings = privacy_scrub.scan_commits(root, "HEAD")
             rules = {item.rule for item in findings if item.location.startswith(f"{sha}:commit-message")}
             self.assertIn("machine-path", rules)
@@ -247,11 +353,60 @@ class CommitScanTests(unittest.TestCase):
             self.assertNotIn(path, rendered)
             self.assertNotIn(token, rendered)
 
+    def test_secret_added_then_removed_in_range_is_found(self):
+        email = joined("someone", "@", "example.com")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = _commit(
+                root, "readme.txt", "clean\n", "Start\n", ALLOWED_EMAIL, ALLOWED_EMAIL
+            )
+            _commit_existing(root, "note.txt", f"contact {email}\n", "Add note\n")
+            _commit_existing(root, "note.txt", "contact none\n", "Remove note\n")
+            findings = privacy_scrub.scan_commits(root, f"{first}..HEAD")
+            rendered = "\n".join(item.render() for item in findings)
+            self.assertTrue(
+                any(item.rule == "email" and ":added:" in item.location for item in findings),
+                rendered,
+            )
+            self.assertNotIn(email, rendered)
+            completed = _run_script(root, f"{first}..HEAD")
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertNotIn(email, completed.stdout)
+            self.assertNotIn(email, completed.stderr)
+            self.assertIn("email", completed.stdout)
 
-def _commit(root: Path, message: str, author_email: str, committer_email: str) -> str:
-    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
-    (root / "readme.txt").write_text("clean\n", encoding="utf-8")
-    subprocess.run(["git", "add", "readme.txt"], cwd=root, check=True)
+    def test_text_env_scans_values(self):
+        email = joined("someone", "@", "example.com")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _commit(root, "readme.txt", "clean\n", "Record a note\n", ALLOWED_EMAIL, ALLOWED_EMAIL)
+            completed = _run_script(
+                root,
+                "HEAD",
+                extra=["--text-env", "PR_TITLE", "--text-env", "PR_BODY"],
+                env_updates={"PR_TITLE": "Add " + email, "PR_BODY": "clean description"},
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertNotIn(email, completed.stdout)
+            self.assertNotIn(email, completed.stderr)
+            self.assertIn("env:PR_TITLE", completed.stdout)
+            self.assertIn("email", completed.stdout)
+
+    def test_text_env_empty_is_noop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _commit(root, "readme.txt", "clean\n", "Record a note\n", ALLOWED_EMAIL, ALLOWED_EMAIL)
+            completed = _run_script(
+                root,
+                "HEAD",
+                extra=["--text-env", "PR_TITLE", "--text-env", "PR_BODY"],
+                env_updates={"PR_TITLE": "", "PR_BODY": ""},
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertIn("privacy scrub: ok", completed.stdout)
+
+
+def _git_commit(root: Path, message: str, author_email: str, committer_email: str) -> str:
     env = os.environ.copy()
     env.update(
         {
@@ -270,21 +425,53 @@ def _commit(root: Path, message: str, author_email: str, committer_email: str) -
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
 
 
-def _run_script(root: Path, commits: str) -> subprocess.CompletedProcess[str]:
+def _commit(
+    root: Path,
+    filename: str,
+    content: str,
+    message: str,
+    author_email: str,
+    committer_email: str,
+) -> str:
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+    (root / filename).write_text(content, encoding="utf-8")
+    subprocess.run(["git", "add", filename], cwd=root, check=True)
+    return _git_commit(root, message, author_email, committer_email)
+
+
+def _commit_existing(root: Path, filename: str, content: str, message: str) -> str:
+    (root / filename).write_text(content, encoding="utf-8")
+    subprocess.run(["git", "add", filename], cwd=root, check=True)
+    return _git_commit(root, message, ALLOWED_EMAIL, ALLOWED_EMAIL)
+
+
+def _run_script(
+    root: Path,
+    commits: str,
+    extra: list[str] | None = None,
+    env_updates: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    if env_updates:
+        env.update(env_updates)
+    command = [
+        sys.executable,
+        str(ROOT / "scripts" / "privacy_scrub.py"),
+        "--root",
+        str(root),
+        "--commits",
+        commits,
+        "--allow",
+        str(root / "missing-allow.txt"),
+    ]
+    if extra:
+        command.extend(extra)
     return subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "scripts" / "privacy_scrub.py"),
-            "--root",
-            str(root),
-            "--commits",
-            commits,
-            "--allow",
-            str(root / "missing-allow.txt"),
-        ],
+        command,
         check=False,
         capture_output=True,
         text=True,
+        env=env,
     )
 
 

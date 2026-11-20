@@ -44,13 +44,16 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           BEFORE: ${{ github.event.before }}
           SHA: ${{ github.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -eu
           if [ "$EVENT_NAME" = "pull_request" ]; then
             range="origin/${BASE_REF}..HEAD"
+            set -- --commits "$range" --text-env PR_TITLE --text-env PR_BODY
           elif [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            range="HEAD"
+            set -- --commits "HEAD"
           else
-            range="${BEFORE}..${SHA}"
+            set -- --commits "${BEFORE}..${SHA}"
           fi
-          python3 scripts/privacy_scrub.py --commits "$range"
+          python3 scripts/privacy_scrub.py "$@"
