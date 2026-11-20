@@ -40,3 +40,23 @@ A parsed listing is stored on disk for 24 hours. Runs inside that window do not 
 ## Credit
 
 Directory suggestions end with `Data from grok-bot.directory` and a Found by line that uses `REPO_URL` only. Do not add a teammate name, description, or prompt to that Found by link. The team path does not print the directory credit line, because the directory was not read.
+
+## Privacy scrub
+
+The `test` check runs `scripts/privacy_scrub.py`. The script uses only the Python standard library. It scans every tracked file. On a pull request it also scans the commits in `origin/<base>..HEAD`, including commit messages and author and committer names and emails. On a push to `main` it scans the commits that were pushed. Checkout for that job uses a full history so the range is available.
+
+The scrub fails when it finds any of these:
+
+- An email address, except a GitHub noreply address and `cursoragent@cursor.com`. The noreply forms are `<digits>+<user>@users.noreply.github.com`, `<user>@users.noreply.github.com`, and `noreply@github.com`. A `Co-authored-by` trailer is part of the commit message, so an email there fails the check too.
+- A machine path: a Linux or macOS home directory (including a home directory named box), a workspace root path, or a Windows profile path.
+- A key-like string: a GitHub token (`ghp_`, `gho_`, `ghs_`, or `github_pat_`), an `xai-` or `sk-` API key, an AWS access key id (`AKIA` plus 16 letters or digits), a Slack token (`xoxb-`, `xoxa-`, `xoxp-`, `xoxr-`, or `xoxs-`), a private key block, or a long high-entropy token assigned to a name that contains `key`, `secret`, `token`, or `password`.
+
+Each finding prints the file and line, or the commit SHA, the rule name, and a redacted preview. The matched value itself is not printed.
+
+`scripts/privacy_scrub_allow.txt` can skip a documented test fixture by path, or one line of a fixture with `path:line`. The scrub's own tests build sample values by joining pieces at runtime so those samples are not stored in the repository.
+
+From the repository root:
+
+```bash
+python3 scripts/privacy_scrub.py --commits origin/main..HEAD
+```

@@ -1,0 +1,3 @@
+# Documented fixture for the privacy scrub. Fake examples only.
+contact = someone@example.com
+notes = /home/box/example
