@@ -20,6 +20,16 @@ Over a thousand bots are already listed on [grok-bot.directory](https://grok-bot
 - The bot shows up to 3 listed bots that fit, with a reason for each.
 - You decide if you want any of them. Nothing is added for you.
 
+## Skills
+
+| Skill | What it does | Link |
+|---|---|---|
+| grok-bot-directory-router | Checks your team first. If none is a strong fit, shows the top 3 listed bots. Suggest only. | [SKILL.md](skills/grok-bot-directory-router/SKILL.md) |
+| pr-landing-rules | States the three gates for a squash merge: a human grant, a non-author agent PASS, and green CI on the exact commit. | [SKILL.md](skills/pr-landing-rules/SKILL.md) |
+
+<details>
+<summary>grok-bot-directory-router</summary>
+
 ## Install in 3 steps
 
 1. Download or clone this repo.
@@ -81,12 +91,30 @@ cd skills/grok-bot-directory-router
 python3 rank.py "make a YouTube channel" --top 3
 ```
 
-## Skills
+</details>
 
-| Skill | Use it when | What it does |
-|---|---|---|
-| [grok-bot-directory-router](skills/grok-bot-directory-router/SKILL.md) | You start a new project, a new workstream, or want a bot for a job. | Checks your team first. If none is a strong fit, shows the top 3 listed bots. Suggest only. |
-| [pr-landing-rules](skills/pr-landing-rules/SKILL.md) | An agent is about to merge a pull request or land a stack. | States the three gates for a squash merge. The same rules for people are in [docs/landing.md](docs/landing.md). |
+<details>
+<summary>pr-landing-rules</summary>
+
+## Install in 3 steps
+
+1. Download or clone this repo.
+2. Copy the folder `skills/pr-landing-rules/` into the skills folder your Grok Bot reads. Or create a new skill and paste in the text of [`SKILL.md`](skills/pr-landing-rules/SKILL.md).
+3. The skill is the `SKILL.md` text. It does not need Python or any other runtime to use.
+
+## How it works
+
+An agent may squash-merge a pull request only when all three gates are true:
+
+1. A human has granted landing for the pull request or stack, in their own words, in the chat or on the pull request.
+2. An agent that did not write the code has posted PASS on the pull request, naming the exact commit it checked.
+3. The required `test` check is green on that same commit, and the branch is up to date with `main`.
+
+Green CI plus a bot approval alone is not enough. No agent merges its own PR. Until the repository owner explicitly approves agent landing, every pull request stops at merge-ready.
+
+The same rules for people are in [docs/landing.md](docs/landing.md). The skill text is in [`SKILL.md`](skills/pr-landing-rules/SKILL.md).
+
+</details>
 
 ## Safety notes
 
