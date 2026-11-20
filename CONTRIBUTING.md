@@ -13,5 +13,11 @@ Thanks for improving a skill. Keep the change small and easy to read.
   ```
 
 - Open a branch and a pull request. Do not commit straight to `main`.
+- Agents follow the landing rules in [skills/pr-landing-rules/SKILL.md](skills/pr-landing-rules/SKILL.md). The same rules for people, including the owner's checklist, are in [docs/landing.md](docs/landing.md).
+- The landing-rules text test is offline. From the repository root:
+
+  ```bash
+  python3 -m unittest discover -s skills/pr-landing-rules/tests -v
+  ```
 
 `REPO_URL` in `skills/grok-bot-directory-router/rank.py` is the only repository link the router prints. Change it there, not in several files.

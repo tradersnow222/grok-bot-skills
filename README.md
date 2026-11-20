@@ -66,6 +66,7 @@ python3 rank.py "make a YouTube channel" --top 3
 | Skill | Use it when | What it does |
 |---|---|---|
 | [grok-bot-directory-router](skills/grok-bot-directory-router/SKILL.md) | You start a new project, a new workstream, or want a new bot for a job. | Shows the top 3 listed bots for your task. Suggest only. |
+| [pr-landing-rules](skills/pr-landing-rules/SKILL.md) | An agent is about to merge a pull request or land a stack. | States the three gates for a squash merge. The same rules for people are in [docs/landing.md](docs/landing.md). |
 
 ## Safety notes
 
