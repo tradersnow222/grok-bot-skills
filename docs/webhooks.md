@@ -1,5 +1,7 @@
 # How to optimize your Grok Bot usage with webhooks
 
+![A small robot at a desk looks up as a glowing doorbell rings across the room](images/webhooks-banner.png)
+
 **TLDR:** Use a webhook routine when something outside can tell your bot that new data arrived. Keep a timed routine when the clock is the reason the job runs. And check your usage breakdown first, because your chats might be costing more than your routines.
 
 I run a team of Grok Bots, and a lot of their work runs on routines. Like many others, I immediately started running into usage limits early in the week! At first, I simply cut back most of my routines. But recently, Matt Palmer (@mattyp) and Lauren Tan (@poteto) brought up webhooks in their [live Grok Bot Q&A](https://x.com/mattyp/status/2121439659179848108). So I dug in. Here's what I learned, in plain terms, and how to decide which jobs should use a webhook.
@@ -8,13 +10,19 @@ I run a team of Grok Bots, and a lot of their work runs on routines. Like many o
 
 Every routine needs something to start it. A routine that runs on a timer is like walking to the mailbox every day to check for a specific package. Most days it's empty, but the trip still costs you time and energy. A routine that runs on a webhook is like a doorbell. Your bot stays put and only wakes up when something actually arrives.
 
+![On the left, a tired robot walks loop after loop to an empty mailbox. On the right, the same robot relaxes in an armchair while the doorbell glows and a parcel waits at the door](images/mailbox-vs-doorbell.png)
+
 ## First, check where your usage goes
 
 Here are my own numbers for this week so far (Nov 19 to Nov 20). I've used 23% of my weekly Grok Bot limit. Routines took only 2.1% of the limit. Group chats took 13%, my bots messaging each other took 5.1%, and my own chats with my bots took 2.9%.
 
 ![My Grok Bot usage by source, Nov 19 to Nov 20: 23% of my weekly limit, with group chats at 13%, bot-to-bot at 5.1%, my own chats at 2.9% and routines at 2.1%](images/grok-bot-usage-nov-19-20.png)
 
-Your split will look different, so check yours first. Switching timed routines to webhooks can only shrink the routine slice. If your bots chat a lot, that's probably where most of your usage goes.
+Your split will look different, so check yours first. You can ask your bot:
+
+> "Check my Grok Bot usage for this week. Which bots, routines and chats used the most? Tell me how much went to routines compared with chats."
+
+Switching timed routines to webhooks can only shrink the routine slice. If your bots chat a lot, that's probably where most of your usage goes.
 
 ## Why webhooks save usage
 
@@ -24,7 +32,13 @@ A timed routine runs on the clock, even when nothing new came in. A webhook rout
 
 So who sends that request? It can be a small script you set up outside Grok Bot. It checks for external changes and contacts your bot only when something is new, passing along only the new items. Google Apps Script, GitHub Actions or a Cloudflare Worker can all run a script like this, and each has a free tier.
 
+![A small script checks for changes, sends a request carrying a secret key, and the bot wakes up](images/webhook-flow.png)
+
 You might be thinking that script still checks on a timer, right? Well, it does, but its checks don't use any of your Grok Bot usage! Your bot only wakes up when there's real news, and it has less to read when it does.
+
+Your bot can help you build both pieces. Try something like this:
+
+> "Help me turn my [routine name] routine into a webhook routine. Then write a small Google Apps Script that checks [the thing I'm waiting on] for anything new. It should only send a request when something changed, with just the new items. I'll paste the web address and secret key into the script myself."
 
 ## How to decide between a timed routine and a webhook
 
@@ -41,6 +55,10 @@ Ask one question: can the thing I'm waiting on tell my bot when something happen
 
 - A morning digest or a weekly report. Nothing outside is going to announce "it's Monday."
 - A reminder or deadline that has to happen even if nothing ever shows up.
+
+Not sure which of your routines fit? Ask your bot to sort them for you:
+
+> "Go through my routines one by one. For each one, tell me if the clock is really the reason it runs. If it's waiting on something outside, like GitHub, Slack, an email or another app, tell me if a webhook routine or a built-in trigger would work. Don't change anything yet. Just give me the list."
 
 ## Two updates I'm making now
 
@@ -59,6 +77,10 @@ Next up is a daily finance check. Instead of running on a timer, it'll wake up w
 - **There are limits.** Grok Bot allows up to 300 runs an hour across all your routines, and 200 an hour for any one routine.
 - **Some services need a go-between.** Stripe, App Store Connect, and the push notifications from Gmail and Google Calendar can't add that key. They need a small relay in between, which receives their message and passes it on with your key. Hookdeck is one example, or you can write a short Cloudflare Worker.
 - **Some services charge extra.** Zapier's free plan treats webhooks as a premium feature, and IFTTT webhooks need a paid plan, so check current pricing before you build on them.
+
+It's worth telling your bot about the key up front:
+
+> "Remember this for every webhook routine we set up. Never ask me to paste its secret key into a chat. Never write the key into a message, a file or a post. It only goes in the outside script."
 
 lmk if you try this and what it saves you!
 
