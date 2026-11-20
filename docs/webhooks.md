@@ -21,7 +21,10 @@ Here are my own numbers for this week so far (Nov 19 to Nov 20). I've used 23% o
 Your split will look different, so check yours first. You can ask your bot:
 
 ```text
-Check my Grok Bot usage for this week. Which bots, routines and chats used the most? Tell me how much went to routines compared with chats.
+Check my Grok Bot usage for this week.
+Which bots, routines and chats used
+the most? Tell me how much went to
+routines compared with chats.
 ```
 
 Switching timed routines to webhooks can only shrink the routine slice. If your bots chat a lot, that's probably where most of your usage goes.
@@ -41,7 +44,15 @@ You might be thinking that script still checks on a timer, right? Well, it does,
 Your bot can help you build both pieces. Try something like this:
 
 ```text
-Help me turn my [routine name] routine into a webhook routine. Then write a small Google Apps Script that checks [the thing I'm waiting on] for anything new. It should only send a request when something changed, with just the new items. I'll paste the web address and secret key into the script myself.
+Help me turn my [routine name]
+routine into a webhook routine. Then
+write a small Google Apps Script
+that checks [the thing I'm waiting
+on] for anything new. It should only
+send a request when something
+changed, with just the new items.
+I'll paste the web address and
+secret key into the script myself.
 ```
 
 ## How to decide between a timed routine and a webhook
@@ -63,7 +74,15 @@ Ask one question: can the thing I'm waiting on tell my bot when something happen
 Not sure which of your routines fit? Ask your bot to sort them for you:
 
 ```text
-Go through my routines one by one. For each one, tell me if the clock is really the reason it runs. If it's waiting on something outside, like GitHub, Slack, an email or another app, tell me if a webhook routine or a built-in trigger would work. Don't change anything yet. Just give me the list.
+Go through my routines one by one.
+For each one, tell me if the clock
+is really the reason it runs. If
+it's waiting on something outside,
+like GitHub, Slack, an email or
+another app, tell me if a webhook
+routine or a built-in trigger would
+work. Don't change anything yet.
+Just give me the list.
 ```
 
 ## Two updates I'm making now
@@ -87,7 +106,12 @@ Next up is a daily finance check. Instead of running on a timer, it'll wake up w
 It's worth telling your bot about the key up front:
 
 ```text
-Remember this for every webhook routine we set up. Never ask me to paste its secret key into a chat. Never write the key into a message, a file or a post. It only goes in the outside script.
+Remember this for every webhook
+routine we set up. Never ask me to
+paste its secret key into a chat.
+Never write the key into a message, a
+file or a post. It only goes in the
+outside script.
 ```
 
 lmk if you try this and what it saves you!
