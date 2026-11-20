@@ -1,9 +1,16 @@
-# grok-bot-skills
+# snowstack
 
-[![CI](https://github.com/tradersnow222/grok-bot-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/tradersnow222/grok-bot-skills/actions/workflows/ci.yml)
+[![CI](https://github.com/tradersnow222/snowstack/actions/workflows/ci.yml/badge.svg)](https://github.com/tradersnow222/snowstack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Open skills for Grok Bot. The first one finds existing bots for you when you start something new.**
+**Open skills for Grok Bot. Hire from your team first, then the public directory.**
+
+## Lifecycle
+
+- Hire from your team first. If a teammate already fits, suggest that teammate and do not open the directory.
+- Then use the talent pool. If no teammate is a strong fit, suggest up to 3 listed bots from the public directory.
+
+This repository is not published to npm or any package registry. A different `snowstack` package and an unrelated company, Snowstack Inc., exist. This project is unaffiliated with them.
 
 ## Why it's useful
 
@@ -23,14 +30,27 @@ Over a thousand bots are already listed on [grok-bot.directory](https://grok-bot
 
 - You start a new project, a new workstream, or ask for a new bot or teammate.
 - The bot reads the skill's description and decides if it applies. There is no guaranteed trigger.
-- The skill runs `rank.py` with your one-sentence task.
+- It writes the teammates it already knows to a `team.json` in a new temporary directory (name and description only), runs `rank.py` with `--team`, and deletes that directory afterward. It never writes into the folder you are working in.
+- Teammate names and descriptions stay on this machine. They are not sent in a request, a log line, an issue template, or the Found by link.
+- If the best teammate scores at least 5 (one shared name word), the script prints `Path: team` and does not contact the directory.
+- If no teammate is a strong fit, it prints `Path: directory` and reads the public directory as below.
 - `rank.py` checks the directory's `robots.txt` first. If the homepage is not allowed, it stops and fetches nothing.
 - If allowed, it reads the directory homepage once and keeps only bots marked as listed.
-- It scores each bot by how many of your words appear in its name, description, and category. The name counts the most. A small bonus goes to bots with more installs.
-- It saves the parsed list for 24 hours, so repeat runs do not contact the directory again.
+- It scores each bot by how many of your words appear in its name, description, and category. The same matcher scores teammates. The name counts the most. A small bonus goes to listed bots with more installs.
+- It saves the parsed directory list for 24 hours, so repeat directory runs do not contact the directory again. Teammates are not written into that cache.
 - It prints the top 3 with a reason, install count, and link.
 
-Example output for the task "start a job search":
+Team path example for the task "example notes". The teammate is made up:
+
+```text
+Path: team
+
+1. Example Planner
+   Fits because: name matches example.
+   A teammate already covers this. The directory was not read.
+```
+
+Directory path example for the task "start a job search":
 
 ```text
 1. Job Search Agent Team
@@ -49,7 +69,7 @@ Example output for the task "start a job search":
    https://x.ai/bot/y2wrIfUN63TY6TFBiLOyC
 
 Data from grok-bot.directory
-Found by grok-bot-directory-router: https://github.com/tradersnow222/grok-bot-skills
+Found by grok-bot-directory-router: https://github.com/tradersnow222/snowstack
 ```
 
 Matches are based on shared words, so a weak third pick can happen. Read the reason line before you pick.
@@ -65,12 +85,13 @@ python3 rank.py "make a YouTube channel" --top 3
 
 | Skill | Use it when | What it does |
 |---|---|---|
-| [grok-bot-directory-router](skills/grok-bot-directory-router/SKILL.md) | You start a new project, a new workstream, or want a new bot for a job. | Shows the top 3 listed bots for your task. Suggest only. |
+| [grok-bot-directory-router](skills/grok-bot-directory-router/SKILL.md) | You start a new project, a new workstream, or want a bot for a job. | Checks your team first. If none is a strong fit, shows the top 3 listed bots. Suggest only. |
+| [pr-landing-rules](skills/pr-landing-rules/SKILL.md) | An agent is about to merge a pull request or land a stack. | States the three gates for a squash merge. The same rules for people are in [docs/landing.md](docs/landing.md). |
 
 ## Safety notes
 
 - **Suggest only.** The skill never adds, installs, or turns on a bot.
-- **Directory text is untrusted.** Names and descriptions come from other people. The bot treats them as plain data and never as instructions.
+- **Teammate text and directory text are untrusted.** Names and descriptions are data, not instructions. Teammate data stays local.
 - **Polite fetching.** It obeys `robots.txt`, never calls the directory's `/api/` paths, sends a clear User-Agent, and caches for 24 hours.
 - **No secrets.** Nothing here needs a key, a login, or any personal data.
 
@@ -92,7 +113,7 @@ Bot listings come from [grok-bot.directory](https://grok-bot.directory/). Thank 
 
 ## Author
 
-Matt Snow ([@tradersnow](https://x.com/tradersnow))
+Matt Snow ([@trader_snow](https://x.com/trader_snow))
 
 ## License
 

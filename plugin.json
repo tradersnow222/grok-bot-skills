@@ -1,7 +1,9 @@
 {
-  "name": "grok-bot-skills",
-  "description": "Open skills for Grok Bot. The first skill suggests existing directory bots when a new project, workstream, or teammate is needed, and does not install them.",
-  "version": "0.1.0",
+  "name": "snowstack",
+  "description": "Open skills for Grok Bot. Hire from the current team first, then suggest listed directory bots. Suggestions only. Teammate text stays local.",
+  "version": "0.2.0",
   "license": "MIT",
+  "repository": "https://github.com/tradersnow222/snowstack",
+  "homepage": "https://github.com/tradersnow222/snowstack",
   "skills": "./skills/"
 }
