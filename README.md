@@ -30,6 +30,10 @@ Safety rules for suggestions, untrusted listing text, and robots.txt are in [doc
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/writing-a-skill.md](docs/writing-a-skill.md).
 
+## Author
+
+Created by Matt Snow ([@tradersnow](https://x.com/tradersnow)).
+
 ## License
 
 [MIT](LICENSE). Copyright grok-bot-skills contributors.
