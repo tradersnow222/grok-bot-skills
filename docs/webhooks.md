@@ -85,7 +85,7 @@ work. Don't change anything yet.
 Just give me the list.
 ```
 
-Webhooks are one good way to trim usage, but they aren't the only one. If a timed routine is costing you usage, the first cuts are usually simpler: pause the ones you don't need, run the rest less often and only in waking hours, and tell them to stay quiet when nothing changed. Grok Bot's own docs put those first. Switch to a built-in trigger or a webhook when the job is really waiting on an event.
+Webhooks are one good way to trim usage, but they aren't the only one. If a timed routine is costing you usage, the first cuts are usually simpler: pause the ones you don't need, run the rest less often and only in waking hours, and tell them to stay quiet when nothing changed. Grok Bot's [own docs](https://docs.x.ai/grok-bot/skills-routines-and-automations) suggest pausing and widening schedules first. Switch to a built-in trigger or a webhook when the job is really waiting on an event.
 
 ## Two updates I'm making now
 
