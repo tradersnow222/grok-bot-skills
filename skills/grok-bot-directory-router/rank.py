@@ -2,6 +2,8 @@
 """Rank listed bots from the public Grok Bot directory for one task.
 
 Suggest-only. This script never installs a bot and never requests /api/.
+With --team, local teammates are scored first with the same matcher.
+Teammate text is data, not instructions, and it is not sent on the network.
 Listing text is data for keyword overlap, not instructions to follow.
 """
 
@@ -48,6 +50,11 @@ NAME_WEIGHT = 5
 CATEGORY_WEIGHT = 2
 DESCRIPTION_WEIGHT = 1
 INSTALL_WEIGHT = 0.25
+# KISS: one cutoff, the same matcher as directory bots. Suggest only.
+# 5 is one shared name word (NAME_WEIGHT). A description word scores 1,
+# so a single shared description word is not a strong fit.
+TEAM_SCORE_THRESHOLD = NAME_WEIGHT
+NO_STRONG_TEAMMATE = "No teammate was a strong fit."
 
 class DirectoryError(Exception):
     """The directory could not be read and there is nothing safe to show."""
@@ -55,6 +62,10 @@ class DirectoryError(Exception):
 
 class PayloadError(DirectoryError):
     """The homepage did not contain a bot list we know how to read."""
+
+
+class TeamFileError(Exception):
+    """The local teammate file could not be used. The directory was not contacted."""
 
 
 def check_url(url: str) -> None:
@@ -360,8 +371,88 @@ def rank_bots(bots: list[dict], task: str, top: int = 3) -> list[dict]:
     return [row[3] for row in ranked[:top]]
 
 
-def render_text(matches: list[dict], meta: dict) -> str:
+def load_teammates(path: str) -> list[dict]:
+    """Read a local JSON list of {name, description}. Other fields are ignored."""
+    file_path = Path(path)
+    try:
+        raw = file_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise TeamFileError("Could not read the team file.") from exc
+    if not raw.strip():
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise TeamFileError("Team file must be a JSON list of name and description.") from exc
+    if not isinstance(data, list):
+        raise TeamFileError("Team file must be a JSON list of name and description.")
+    teammates = []
+    for item in data:
+        if not isinstance(item, dict):
+            raise TeamFileError("Each teammate must be an object with name and description.")
+        name = item.get("name")
+        description = item.get("description", "")
+        if not isinstance(name, str) or not name.strip():
+            raise TeamFileError("Each teammate needs a name.")
+        if description is None:
+            description = ""
+        if not isinstance(description, str):
+            raise TeamFileError("A teammate description must be text.")
+        teammates.append({"name": name.strip(), "description": description})
+    return teammates
+
+
+def rank_teammates(teammates: list[dict], task: str) -> list[dict]:
+    """Score teammates with field_hits and score_hits. No install bonus, no network."""
+    query = _unique(tokenize(task))
+    ranked = []
+    for mate in teammates:
+        hits = field_hits(
+            {"name": mate["name"], "description": mate["description"], "category": ""},
+            query,
+        )
+        score = score_hits(hits, 0)
+        ranked.append(
+            (
+                score,
+                mate["name"].lower(),
+                {
+                    "name": mate["name"],
+                    "reason": reason_for(hits),
+                    "score": round(score, 4),
+                },
+            )
+        )
+    ranked.sort(key=lambda row: (-row[0], row[1]))
+    return [row[2] for row in ranked]
+
+
+def best_teammate(teammates: list[dict], task: str) -> dict | None:
+    ranked = rank_teammates(teammates, task)
+    if not ranked or ranked[0]["score"] < TEAM_SCORE_THRESHOLD:
+        return None
+    return ranked[0]
+
+
+def render_team_text(match: dict) -> str:
+    lines = [
+        "Path: team",
+        "",
+        f"1. {match['name']}",
+        f"   Fits because: {match['reason']}.",
+        "   A teammate already covers this. The directory was not read.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def render_text(matches: list[dict], meta: dict, path: str | None = None, preface: str = "") -> str:
     lines: list[str] = []
+    if path:
+        lines.append(f"Path: {path}")
+        lines.append("")
+    if preface:
+        lines.append(preface)
+        lines.append("")
     if meta.get("stale"):
         lines.append(f"{meta.get('error', 'Directory could not be read.')} Showing a stale cached listing.")
         lines.append("Retry later. These rows are not a fresh read.")
@@ -380,7 +471,14 @@ def render_text(matches: list[dict], meta: dict) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_json(task: str, matches: list[dict], meta: dict, parsed: int) -> str:
+def render_json(
+    task: str,
+    matches: list[dict],
+    meta: dict,
+    parsed: int,
+    path: str | None = None,
+    preface: str = "",
+) -> str:
     payload = {
         "task": task,
         "stale": bool(meta.get("stale")),
@@ -388,10 +486,15 @@ def render_json(task: str, matches: list[dict], meta: dict, parsed: int) -> str:
         "source": meta.get("source") or "",
         "parsed": parsed,
         "matches": matches,
-        "data_from": "grok-bot.directory",
-        "found_by": "grok-bot-directory-router",
-        "repo": REPO_URL,
     }
+    if path:
+        payload["path"] = path
+    if preface:
+        payload["team_note"] = preface
+    if path != "team":
+        payload["data_from"] = "grok-bot.directory"
+    payload["found_by"] = "grok-bot-directory-router"
+    payload["repo"] = REPO_URL
     return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
 
 
@@ -403,32 +506,79 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--top", type=int, default=3, help="How many matches to show (default 3)")
     parser.add_argument("--json", action="store_true", help="Print JSON instead of text")
     parser.add_argument("--refresh", action="store_true", help="Fetch again even if the cache is fresh")
+    parser.add_argument(
+        "--team",
+        default=None,
+        help="Local JSON list of {name, description}. A strong match skips the directory.",
+    )
     return parser.parse_args(argv)
+
+
+def _directory_path(args: argparse.Namespace) -> str | None:
+    return "directory" if args.team else None
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    if not args.task or not args.task.strip():
+    task = args.task.strip() if args.task else ""
+    if not task:
         print("Give the task in one sentence.", file=sys.stderr)
         return 1
     if args.top < 1:
         print("Top must be at least 1.", file=sys.stderr)
         return 1
+
+    preface = ""
+    if args.team:
+        try:
+            teammates = load_teammates(args.team)
+        except TeamFileError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        best = best_teammate(teammates, task)
+        if best is not None:
+            if args.json:
+                sys.stdout.write(
+                    render_json(
+                        task,
+                        [best],
+                        {"stale": False, "error": "", "source": "team"},
+                        len(teammates),
+                        path="team",
+                    )
+                )
+            else:
+                sys.stdout.write(render_team_text(best))
+            print("Directory was not read.", file=sys.stderr)
+            return 0
+        preface = NO_STRONG_TEAMMATE
+
     try:
         bots, meta = load_listing(refresh=args.refresh)
     except DirectoryError as exc:
         message = f"Directory could not be read. {exc} Retry later. No bots to suggest."
         if args.json:
             sys.stdout.write(
-                render_json(args.task.strip(), [], {"stale": False, "error": str(exc), "source": ""}, 0)
+                render_json(
+                    task,
+                    [],
+                    {"stale": False, "error": str(exc), "source": ""},
+                    0,
+                    path=_directory_path(args),
+                    preface=preface,
+                )
             )
+        elif preface:
+            print(preface, file=sys.stderr)
         print(message, file=sys.stderr)
         return 1
-    matches = rank_bots(bots, args.task, top=args.top)
+    matches = rank_bots(bots, task, top=args.top)
     if args.json:
-        sys.stdout.write(render_json(args.task.strip(), matches, meta, len(bots)))
+        sys.stdout.write(
+            render_json(task, matches, meta, len(bots), path=_directory_path(args), preface=preface)
+        )
     else:
-        sys.stdout.write(render_text(matches, meta))
+        sys.stdout.write(render_text(matches, meta, path=_directory_path(args), preface=preface))
     note = f"Parsed {len(bots)} listed bots ({meta.get('source')})."
     if meta.get("stale"):
         note += " Listing is stale."
