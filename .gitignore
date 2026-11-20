@@ -5,3 +5,6 @@ __pycache__/
 
 # Parsed directory listing written by rank.py
 .cache/
+
+# Local teammate list written at runtime. Do not commit names or descriptions.
+team.json
