@@ -14,8 +14,46 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
       - name: Run offline tests
-        run: python3 -m unittest discover -s skills/grok-bot-directory-router/tests -v
+        run: |
+          set -eu
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          found=0
+          while IFS= read -r dir; do
+            found=1
+            python3 -m unittest discover -s "$dir" -p 'test_*.py' -v
+          done < <(find skills -type d -name tests | sort)
+          test "$found" -eq 1
+
+      - name: Fetch pull request base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch --no-tags origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
+      - name: Privacy scrub
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -eu
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            range="origin/${BASE_REF}..HEAD"
+            set -- --commits "$range" --text-env PR_TITLE --text-env PR_BODY
+          elif [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            set -- --commits "HEAD"
+          else
+            set -- --commits "${BEFORE}..${SHA}"
+          fi
+          python3 scripts/privacy_scrub.py "$@"

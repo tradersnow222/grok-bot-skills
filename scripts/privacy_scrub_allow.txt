@@ -1,0 +1,10 @@
+# Privacy scrub allowlist
+#
+# Each non-comment line is a repo-relative path to skip, or path:line to skip
+# one line. Use this only for documented test fixtures. Sample secrets in the
+# scrub tests are built by joining pieces at runtime instead of being stored.
+#
+# tests/fixtures/privacy_scrub_sample.txt holds fake examples so this file can
+# be checked. Those examples are not real secrets.
+
+tests/fixtures/privacy_scrub_sample.txt
