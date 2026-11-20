@@ -116,6 +116,10 @@ The same rules for people are in [docs/landing.md](docs/landing.md). The skill t
 
 </details>
 
+## Guides
+
+- [How to optimize your Grok Bot usage with webhooks](docs/webhooks.md): when to swap a timed routine for a webhook, and how to check where your usage goes first.
+
 ## Safety notes
 
 - **Suggest only.** The skill never adds, installs, or turns on a bot.
