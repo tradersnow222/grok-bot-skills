@@ -1,0 +1,7 @@
+{
+  "name": "grok-bot-skills",
+  "description": "Open skills for Grok Bot. The first skill suggests existing directory bots when a new project, workstream, or teammate is needed, and does not install them.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "skills": "./skills/"
+}
