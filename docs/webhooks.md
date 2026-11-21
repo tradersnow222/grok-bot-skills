@@ -14,7 +14,7 @@ I run a team of Grok Bots, and a lot of their work runs on routines.
 
 When I first started, I immediately started running into usage limits early in the week! Eventually, I cut back most of my routines, and it helped quite a bit... however, I felt like it was simultaneously cutting my entire team's functionality.
 
-Last week, Matt Palmer ([@mattyp](https://x.com/@mattyp)) and Lauren Tan ([@poteto](https://x.com/@poteto)) talked usage in their live [Fri the 13th Grok Bot Q&A](https://x.com/mattyp/status/2121439659179848108), and the webhooks idea came out of it. So I dug into webhooks as one way to cut wasted routine runs. Here's what I learned, in simple terms, and how to decide *which* jobs should use a webhook routine vs a timed routine.
+Last week, Matt Palmer ([@mattyp](https://x.com/mattyp)) and Lauren Tan ([@poteto](https://x.com/poteto)) talked usage in their live [Fri the 13th Grok Bot Q&A](https://x.com/mattyp/status/2121439659179848108), and the webhooks idea came out of it. So I dug into webhooks as one way to cut wasted routine runs. Here's what I learned, in simple terms, and how to decide *which* jobs should use a webhook routine vs a timed routine.
 
 ## Timed routines and webhooks
 
@@ -28,7 +28,7 @@ A routine that runs on a webhook is like a doorbell. Your bot stays put and only
 
 ## First, check where your usage goes
 
-Here are my own numbers for this week so far after implementing some webhooks (Nov 19 to Nov 20). I've used 23% of my weekly Grok Bot limit.
+Here are my own numbers for this week so far (Nov 19 to Nov 20). I've used 23% of my weekly Grok Bot limit.
 
 - Group chats took 13%.
 - My bots messaging each other took 5.1%.
@@ -144,7 +144,7 @@ Thanks for reading! lmk if you try this and what it saves you.
 ## Sources
 
 - *Grok Bot Q&A with Matt Palmer and Lauren Tan, Nov 13, where the webhooks idea came from:* [https://x.com/mattyp/status/2121439659179848108](https://x.com/mattyp/status/2121439659179848108)
-- *Grok Bot docs on skills, routines and automations, for the run limits, the bearer key and no retries on failed runs:* [https://docs.x.ai/grok-bot/skills-routines-and-automations](https://docs.x.ai/grok-bot/skills-routines-and-automations)
+- *Grok Bot docs on skills, routines and automations, for the run limits, the bearer key and no retries on runs that hit the hourly cap:* [https://docs.x.ai/grok-bot/skills-routines-and-automations](https://docs.x.ai/grok-bot/skills-routines-and-automations)
 - *Grok Bot FAQ, for usage being measured by steps and tokens:* [https://docs.x.ai/grok-bot/faq](https://docs.x.ai/grok-bot/faq)
 - *Hookdeck's Grok Bot webhook guide, for the key being the only check and requests to paused routines being lost:* [https://hookdeck.com/webhooks/platforms/using-hookdeck-with-grok-bot-reliable-webhook-triggers](https://hookdeck.com/webhooks/platforms/using-hookdeck-with-grok-bot-reliable-webhook-triggers)
 - *Zapier free plan, for webhook pricing:* [https://help.zapier.com/hc/en-us/articles/32337438839565-What-s-included-in-Zapier-s-Free-plan](https://help.zapier.com/hc/en-us/articles/32337438839565-What-s-included-in-Zapier-s-Free-plan)
